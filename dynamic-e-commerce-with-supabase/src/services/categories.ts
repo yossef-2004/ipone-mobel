@@ -3,27 +3,56 @@ import { HttpError } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 import type { CategoryDTO } from "@/types";
 
-export async function listCategories(opts: { withCounts?: boolean; visibleOnly?: boolean } = {}): Promise<CategoryDTO[]> {
-  if (!hasSupabaseConfig) return [];
-  const client = await getSupabaseClient();
-  let query = client
-    .from("categories")
-    .select(opts.withCounts ? "id,name,slug,description,sort_order,products(count)" : "id,name,slug,description,sort_order")
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
-  const { data, error } = await query;
-  if (error) throw new HttpError(503, "تعذّر تحميل الأقسام من Supabase");
+type CategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: number;
+};
 
-  let categories = (data ?? []).map((row) => ({
+type CategoryWithProductCount = CategoryRow & {
+  products: { count: number }[];
+};
+
+function toCategoryDTO(row: CategoryRow): CategoryDTO {
+  return {
     id: row.id,
     name: row.name,
     slug: row.slug,
     description: row.description,
     sortOrder: row.sort_order,
-    ...(opts.withCounts ? { productCount: row.products?.[0]?.count ?? 0 } : {}),
-  })) as CategoryDTO[];
+  };
+}
 
-  if (opts.visibleOnly && categories.length) {
+export async function listCategories(opts: { withCounts?: boolean; visibleOnly?: boolean } = {}): Promise<CategoryDTO[]> {
+  if (!hasSupabaseConfig) return [];
+  const client = await getSupabaseClient();
+  let result: CategoryDTO[];
+  if (opts.withCounts) {
+    const { data, error } = await client
+      .from("categories")
+      .select("id,name,slug,description,sort_order,products(count)")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true })
+      .overrideTypes<CategoryWithProductCount[], { merge: false }>();
+    if (error) throw new HttpError(503, "تعذّر تحميل الأقسام من Supabase");
+    result = (data ?? []).map((row) => ({
+      ...toCategoryDTO(row),
+      productCount: row.products[0]?.count ?? 0,
+    }));
+  } else {
+    const { data, error } = await client
+      .from("categories")
+      .select("id,name,slug,description,sort_order")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true })
+      .overrideTypes<CategoryRow[], { merge: false }>();
+    if (error) throw new HttpError(503, "تعذّر تحميل الأقسام من Supabase");
+    result = (data ?? []).map(toCategoryDTO);
+  }
+
+  if (opts.visibleOnly && result.length) {
     const { data: products, error: productError } = await client
       .from("products")
       .select("category_id")
@@ -31,9 +60,9 @@ export async function listCategories(opts: { withCounts?: boolean; visibleOnly?:
       .not("category_id", "is", null);
     if (productError) throw new HttpError(503, "تعذّر تحميل أقسام المنتجات");
     const visibleCategoryIds = new Set((products ?? []).map((product) => product.category_id));
-    categories = categories.filter((category) => visibleCategoryIds.has(category.id));
+    result = result.filter((category) => visibleCategoryIds.has(category.id));
   }
-  return categories;
+  return result;
 }
 
 async function uniqueSlug(name: string, excludeId?: string): Promise<string> {
