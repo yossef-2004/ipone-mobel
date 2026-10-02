@@ -16,7 +16,7 @@ export default async function AdminLoginPage() {
         <LoginForm />
         {isUsingDefaultCredentials() && (
           <p className="mt-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-xs leading-6 text-amber-200">
-            تنبيه: اضبط ADMIN_PASSWORD و SUPABASE_ADMIN_EMAIL ومتغيرات Supabase قبل تسجيل الدخول.
+            تنبيه: اضبط SUPABASE_ADMIN_EMAIL ومتغيرات Supabase قبل تسجيل الدخول.
           </p>
         )}
       </div>

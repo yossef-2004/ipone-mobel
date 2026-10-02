@@ -8,17 +8,7 @@ export { HttpError };
 export { ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE } from "@/db";
 
 export function isUsingDefaultCredentials(): boolean {
-  return !process.env.ADMIN_PASSWORD || !process.env.SUPABASE_ADMIN_EMAIL || !hasSupabaseConfig;
-}
-
-export function verifyPassword(input: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected || !input || input.length !== expected.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index++) {
-    mismatch |= expected.charCodeAt(index) ^ input.charCodeAt(index);
-  }
-  return mismatch === 0;
+  return !process.env.SUPABASE_ADMIN_EMAIL || !hasSupabaseConfig;
 }
 
 export async function isAdmin(): Promise<boolean> {
