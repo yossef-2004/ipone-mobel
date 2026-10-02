@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+tmp_supabase_check.js
