@@ -1,16 +1,12 @@
 -- ============================================================================
--- OPTIONAL: Supabase Row Level Security policies (NOT active in the current setup)
+-- Supabase Row Level Security policies for the existing application tables.
 -- ----------------------------------------------------------------------------
--- The app currently runs on a plain PostgreSQL database accessed ONLY from the
--- server (Next.js route handlers). Admin permissions are enforced in the server
--- via a signed httpOnly session cookie (see src/lib/auth.ts).
+-- The app uses the Supabase JavaScript client with the publishable key.
+-- Admin API routes authenticate with Supabase Auth; the admin user's
+-- app_metadata.role must be "admin" for the policies below to allow writes.
 --
--- When you move to Supabase:
---   1. Set DATABASE_URL to your Supabase Postgres connection string and run
---      `npx drizzle-kit push`.
---   2. Run this file in the Supabase SQL editor to lock the tables down for the
---      public (anon) API. The server connects with the postgres role and bypasses RLS.
---   3. Mark admin users with app_metadata: { "role": "admin" } in Supabase Auth.
+-- Run this file once after the existing tables are present, then run
+-- supabase/admin-setup.sql for the atomic public order RPC and image access policy.
 -- ============================================================================
 
 alter table categories     enable row level security;

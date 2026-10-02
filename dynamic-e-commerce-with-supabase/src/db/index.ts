@@ -1,24 +1,27 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
-const databaseUrl = process.env.DATABASE_URL;
+export const ADMIN_ACCESS_COOKIE = "orbit_admin_access";
+export const ADMIN_REFRESH_COOKIE = "orbit_admin_refresh";
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co";
+export const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "public-anon-key";
 
-const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
-};
+export const hasSupabaseConfig = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+);
 
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+export async function getSupabaseClient() {
+  const store = await cookies();
+  const accessToken = store.get(ADMIN_ACCESS_COOKIE)?.value;
+  return createClient(supabaseUrl, supabaseKey, {
+    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
+    auth: { persistSession: false, autoRefreshToken: false },
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
 }
 
-export const db = drizzle(pool);
+export const db = supabase;

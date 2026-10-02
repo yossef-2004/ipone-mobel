@@ -1,148 +1,167 @@
-import { desc, eq, inArray, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { orderItems, orders, products } from "@/db/schema";
+import { getSupabaseClient, hasSupabaseConfig } from "@/db";
 import { HttpError } from "@/lib/auth";
-import type { OrderDTO, OrderItemDTO, OrderStatus, Paginated } from "@/types";
+import type { OrderDTO, OrderStatus, Paginated } from "@/types";
 
 export type CreateOrderInput = {
   productId: string;
   quantity: number;
   customerName: string;
   phone: string;
+  province: string;
+  region: string;
   address: string;
+  color: string;
+  capacity: string;
   notes: string;
+  paymentMethod?: "cash";
 };
 
-/** The price is ALWAYS read from the database at order time (never trusted from the client). */
-export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
-  const created = await db.transaction(async (tx) => {
-    const [product] = await tx
-      .select({
-        id: products.id,
-        name: products.name,
-        price: products.price,
-        isAvailable: products.isAvailable,
-        isVisible: products.isVisible,
-      })
-      .from(products)
-      .where(eq(products.id, input.productId))
-      .limit(1);
+const ORDER_SELECT = "*,items:order_items(id,product_id,product_name,unit_price,quantity)";
 
-    if (!product || !product.isVisible) throw new HttpError(404, "هذا الجهاز غير موجود");
-    if (!product.isAvailable) throw new HttpError(409, "عذراً، هذا الجهاز غير متوفر حالياً");
-
-    const total = product.price * input.quantity;
-    if (!Number.isSafeInteger(total)) throw new HttpError(400, "المبلغ الإجمالي غير صالح");
-
-    const [order] = await tx
-      .insert(orders)
-      .values({
-        customerName: input.customerName,
-        phone: input.phone,
-        address: input.address,
-        notes: input.notes,
-        total,
-      })
-      .returning();
-
-    await tx.insert(orderItems).values({
-      orderId: order.id,
-      productId: product.id,
-      productName: product.name,
-      unitPrice: product.price,
-      quantity: input.quantity,
-    });
-    return order.id;
-  });
-
-  const order = await getOrderById(created);
-  if (!order) throw new HttpError(500, "تعذّر قراءة الطلب بعد حفظه");
-  return order;
+function toOrderDTO(row: any): OrderDTO {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    customerName: row.customer_name,
+    phone: row.phone,
+    province: row.province,
+    region: row.region,
+    address: row.address,
+    color: row.color,
+    capacity: row.capacity,
+    notes: row.notes,
+    paymentMethod: row.payment_method,
+    status: row.status,
+    total: Number(row.total),
+    createdAt: row.created_at,
+    items: (row.items ?? []).map((item: any) => ({
+      id: item.id,
+      productId: item.product_id,
+      productName: item.product_name,
+      unitPrice: Number(item.unit_price),
+      quantity: item.quantity,
+    })),
+  };
 }
 
-type OrderRow = typeof orders.$inferSelect;
-
-async function withItems(rows: OrderRow[]): Promise<OrderDTO[]> {
-  if (!rows.length) return [];
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(inArray(orderItems.orderId, rows.map((r) => r.id)));
-  const byOrder = new Map<string, OrderItemDTO[]>();
-  for (const i of items) {
-    const list = byOrder.get(i.orderId) ?? [];
-    list.push({ id: i.id, productId: i.productId, productName: i.productName, unitPrice: i.unitPrice, quantity: i.quantity });
-    byOrder.set(i.orderId, list);
+export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
+  if (!hasSupabaseConfig) {
+    throw new HttpError(503, "يجب تهيئة متغيرات Supabase أولاً.");
   }
-  return rows.map((r) => ({
-    id: r.id,
-    orderNumber: r.orderNumber,
-    customerName: r.customerName,
-    phone: r.phone,
-    address: r.address,
-    notes: r.notes,
-    status: r.status,
-    total: r.total,
-    createdAt: r.createdAt.toISOString(),
-    items: byOrder.get(r.id) ?? [],
-  }));
+  const client = await getSupabaseClient();
+  const { data, error } = await client.rpc("create_public_order", {
+    p_product_id: input.productId,
+    p_quantity: input.quantity,
+    p_customer_name: input.customerName,
+    p_phone: input.phone,
+    p_province: input.province,
+    p_region: input.region,
+    p_address: input.address,
+    p_color: input.color,
+    p_capacity: input.capacity,
+    p_notes: input.notes,
+    p_payment_method: input.paymentMethod ?? "cash",
+  });
+  if (error || !data) {
+    console.error("[orders] create RPC failed", error?.message);
+    throw new HttpError(503, "تعذّر إنشاء الطلب. تأكد من تنفيذ إعدادات Supabase المطلوبة.");
+  }
+  const result = data as Record<string, any>;
+  return {
+    id: result.id,
+    orderNumber: result.order_number,
+    customerName: result.customer_name,
+    phone: result.phone,
+    province: result.province,
+    region: result.region,
+    address: result.address,
+    color: result.color,
+    capacity: result.capacity,
+    notes: result.notes,
+    paymentMethod: result.payment_method,
+    status: result.status,
+    total: Number(result.total),
+    createdAt: result.created_at,
+    items: (result.items ?? []).map((item: any) => ({
+      id: item.id,
+      productId: item.product_id,
+      productName: item.product_name,
+      unitPrice: Number(item.unit_price),
+      quantity: item.quantity,
+    })),
+  };
 }
 
 export async function getOrderById(id: string): Promise<OrderDTO | null> {
-  const rows = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
-  return (await withItems(rows))[0] ?? null;
+  if (!hasSupabaseConfig) return null;
+  const client = await getSupabaseClient();
+  const { data, error } = await client.from("orders").select(ORDER_SELECT).eq("id", id).maybeSingle();
+  if (error) throw new HttpError(503, "تعذّر تحميل الطلب من Supabase");
+  return data ? toOrderDTO(data) : null;
 }
 
 export async function listOrders(
-  opts: { status?: OrderStatus; page?: number; pageSize?: number } = {},
+  opts: { status?: OrderStatus; page?: number; pageSize?: number; q?: string } = {},
 ): Promise<Paginated<OrderDTO>> {
   const page = Math.max(1, opts.page ?? 1);
-  const pageSize = Math.min(200, Math.max(1, opts.pageSize ?? 25));
-  const where = opts.status ? eq(orders.status, opts.status) : undefined;
-  const [c] = await db.select({ n: sql<number>`count(*)::int` }).from(orders).where(where);
-  const rows = await db
-    .select()
-    .from(orders)
-    .where(where)
-    .orderBy(desc(orders.createdAt))
-    .limit(pageSize)
-    .offset((page - 1) * pageSize);
-  const total = c?.n ?? 0;
-  return { items: await withItems(rows), total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  const pageSize = Math.min(100, Math.max(1, opts.pageSize ?? 25));
+  if (!hasSupabaseConfig) {
+    return { items: [], total: 0, page, pageSize, totalPages: 1 };
+  }
+  const client = await getSupabaseClient();
+  let query = client.from("orders").select(ORDER_SELECT, { count: "exact" }).order("created_at", { ascending: false });
+  if (opts.status) query = query.eq("status", opts.status);
+  const search = opts.q?.trim().slice(0, 100).replace(/[%,()]/g, " ");
+  if (search) {
+    const fields = [`customer_name.ilike.%${search}%`, `phone.ilike.%${search}%`, `address.ilike.%${search}%`, `province.ilike.%${search}%`, `region.ilike.%${search}%`];
+    if (/^\d+$/.test(search)) fields.push(`order_number.eq.${search}`);
+    query = query.or(fields.join(","));
+  }
+  const from = (page - 1) * pageSize;
+  const { data, count, error } = await query.range(from, from + pageSize - 1);
+  if (error) throw new HttpError(503, "تعذّر تحميل الطلبات من Supabase");
+  const total = count ?? 0;
+  return {
+    items: (data ?? []).map(toOrderDTO),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<OrderDTO> {
-  const [row] = await db
-    .update(orders)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(orders.id, id))
-    .returning({ id: orders.id });
-  if (!row) throw new HttpError(404, "الطلب غير موجود");
+  if (!hasSupabaseConfig) {
+    throw new HttpError(503, "Supabase غير مهيأ بعد التعديل.");
+  }
+  const client = await getSupabaseClient();
+  const { error } = await client.from("orders").update({ status }).eq("id", id);
+  if (error) throw new HttpError(503, "تعذّر تحديث حالة الطلب");
   const order = await getOrderById(id);
   if (!order) throw new HttpError(404, "الطلب غير موجود");
   return order;
 }
 
 export async function deleteOrder(id: string) {
-  const [row] = await db.delete(orders).where(eq(orders.id, id)).returning({ id: orders.id });
-  if (!row) throw new HttpError(404, "الطلب غير موجود");
+  if (!hasSupabaseConfig) return;
+  const client = await getSupabaseClient();
+  const { data, error } = await client.from("orders").delete().eq("id", id).select("id").maybeSingle();
+  if (error) throw new HttpError(503, "تعذّر حذف الطلب من Supabase");
+  if (!data) throw new HttpError(404, "الطلب غير موجود");
 }
 
 export async function getOrderStats() {
-  const [r] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      newCount: sql<number>`count(*) filter (where ${orders.status} = 'new')::int`,
-      preparing: sql<number>`count(*) filter (where ${orders.status} in ('confirmed','preparing'))::int`,
-      delivered: sql<number>`count(*) filter (where ${orders.status} = 'delivered')::int`,
-      revenue: sql<string>`coalesce(sum(${orders.total}) filter (where ${orders.status} = 'delivered'), 0)::text`,
-    })
-    .from(orders);
-  return {
-    total: r?.total ?? 0,
-    newCount: r?.newCount ?? 0,
-    preparing: r?.preparing ?? 0,
-    delivered: r?.delivered ?? 0,
-    revenue: Number(r?.revenue ?? 0),
-  };
+  if (!hasSupabaseConfig) {
+    return { total: 0, newCount: 0, preparing: 0, delivered: 0, revenue: 0 };
+  }
+  const client = await getSupabaseClient();
+  const [all, fresh, preparing, delivered] = await Promise.all([
+    client.from("orders").select("id", { count: "exact", head: true }),
+    client.from("orders").select("id", { count: "exact", head: true }).eq("status", "new"),
+    client.from("orders").select("id", { count: "exact", head: true }).eq("status", "preparing"),
+    client.from("orders").select("total").eq("status", "delivered"),
+  ]);
+  if (all.error || fresh.error || preparing.error || delivered.error) throw new HttpError(503, "تعذّر تحميل إحصاءات الطلبات");
+  const revenue = (delivered.data ?? []).reduce((sum, row) => sum + Number(row.total), 0);
+  return { total: all.count ?? 0, newCount: fresh.count ?? 0, preparing: preparing.count ?? 0, delivered: (delivered.data ?? []).length, revenue };
 }

@@ -16,9 +16,10 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const statusParam = one(sp.status);
   const status = ORDER_STATUSES.find((s) => s === statusParam) as OrderStatus | undefined;
+  const q = one(sp.q)?.slice(0, 100);
   const page = Math.max(1, Number(one(sp.page)) || 1);
 
-  const r = await safe(() => listOrders({ status, page, pageSize: 20 }));
+  const r = await safe(() => listOrders({ status, page, pageSize: 20, q }));
 
   const tab = (active: boolean) =>
     `whitespace-nowrap rounded-full border px-4 py-1.5 text-xs font-bold transition ${active ? "grad-bg border-transparent text-white" : "border-white/10 text-white/65 hover:bg-white/8"}`;
@@ -26,10 +27,15 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader title="الطلبات" subtitle={r.data ? `${r.data.total} طلب` : undefined} />
+      <form className="mb-5 flex gap-2" action="/admin/orders">
+        {status && <input type="hidden" name="status" value={status} />}
+        <input name="q" defaultValue={q} placeholder="ابحث بالاسم أو الهاتف أو العنوان أو رقم الطلب" className="input-base max-w-xl" />
+        <button className="rounded-xl border border-white/12 px-5 text-sm text-white transition hover:bg-white/10">بحث</button>
+      </form>
       <div className="-mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-1">
-        <Link href="/admin/orders" className={tab(!status)}>الكل</Link>
+        <Link href={q ? `/admin/orders?q=${encodeURIComponent(q)}` : "/admin/orders"} className={tab(!status)}>الكل</Link>
         {ORDER_STATUSES.map((s) => (
-          <Link key={s} href={`/admin/orders?status=${s}`} className={tab(status === s)}>{STATUS_LABELS[s]}</Link>
+          <Link key={s} href={`/admin/orders?status=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`} className={tab(status === s)}>{STATUS_LABELS[s]}</Link>
         ))}
       </div>
 
@@ -42,7 +48,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               <OrderCard key={o.id} order={o} />
             ))}
           </div>
-          <Pagination page={r.data.page} totalPages={r.data.totalPages} basePath="/admin/orders" params={{ status }} />
+          <Pagination page={r.data.page} totalPages={r.data.totalPages} basePath="/admin/orders" params={{ status, q }} />
         </>
       ) : (
         <EmptyState icon="🧾" title="لا توجد طلبات" description="ستظهر طلبات الحجز هنا فور وصولها من الزبائن." />

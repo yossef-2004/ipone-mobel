@@ -69,7 +69,12 @@ export function OrderCard({ order }: { order: OrderDTO }) {
         <dl className="space-y-1.5 text-sm">
           <Item k="الزبون" v={order.customerName} />
           <Item k="الهاتف" v={<a href={`tel:${order.phone}`} dir="ltr" className="text-aqua hover:underline">{order.phone}</a>} />
+          <Item k="المحافظة" v={order.province || "—"} />
+          <Item k="المنطقة" v={order.region || "—"} />
           <Item k="العنوان" v={order.address} />
+          <Item k="اللون" v={order.color || "—"} />
+          <Item k="السعة" v={order.capacity || "—"} />
+          <Item k="الدفع" v={order.paymentMethod === "cash" ? "Cash عند الاستلام" : order.paymentMethod || "—"} />
           <Item k="الملاحظات" v={order.notes || "—"} />
         </dl>
 

@@ -30,8 +30,13 @@ export function OrderForm({ productId, productName, price, available }: Props) {
         quantity: qty,
         customerName: fd.get("customerName"),
         phone: fd.get("phone"),
+        province: fd.get("province"),
+        region: fd.get("region"),
         address: fd.get("address"),
+        color: fd.get("color"),
+        capacity: fd.get("capacity"),
         notes: fd.get("notes"),
+        paymentMethod: "cash",
       },
     });
     setLoading(false);
@@ -100,11 +105,27 @@ export function OrderForm({ productId, productName, price, available }: Props) {
       <Field label="رقم الهاتف">
         <input name="phone" required inputMode="tel" autoComplete="tel" className="input-base" placeholder="07701234567" dir="ltr" />
       </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="المحافظة">
+          <input name="province" required minLength={2} maxLength={80} className="input-base" placeholder="بغداد" />
+        </Field>
+        <Field label="المنطقة">
+          <input name="region" required minLength={2} maxLength={80} className="input-base" placeholder="المنصور" />
+        </Field>
+      </div>
       <Field label="العنوان">
-        <input name="address" required minLength={5} maxLength={500} autoComplete="street-address" className="input-base" placeholder="المحافظة - المنطقة - أقرب نقطة دالة" />
+        <input name="address" required minLength={5} maxLength={500} autoComplete="street-address" className="input-base" placeholder="الشارع، رقم المنزل، أقرب علامة مميزة" />
       </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="اللون">
+          <input name="color" required minLength={2} maxLength={80} className="input-base" placeholder="أسود" />
+        </Field>
+        <Field label="السعة">
+          <input name="capacity" required minLength={2} maxLength={80} className="input-base" placeholder="256GB" />
+        </Field>
+      </div>
       <Field label="ملاحظات (اختياري)">
-        <textarea name="notes" rows={2} maxLength={1000} className="input-base resize-none" placeholder="اللون المطلوب، وقت التواصل…" />
+        <textarea name="notes" rows={2} maxLength={1000} className="input-base resize-none" placeholder="ملاحظات إضافية، وقت التواصل، أو تفاصيل أخرى" />
       </Field>
 
       <div className="flex items-center justify-between rounded-2xl bg-white/[0.04] p-3">

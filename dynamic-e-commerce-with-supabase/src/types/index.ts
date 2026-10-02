@@ -71,13 +71,20 @@ export type OrderItemDTO = {
   quantity: number;
 };
 
+export type PaymentMethod = "cash";
+
 export type OrderDTO = {
   id: string;
   orderNumber: number;
   customerName: string;
   phone: string;
+  province: string;
+  region: string;
   address: string;
+  color: string;
+  capacity: string;
   notes: string;
+  paymentMethod: PaymentMethod;
   status: OrderStatus;
   total: number;
   createdAt: string;

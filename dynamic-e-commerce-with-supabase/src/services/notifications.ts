@@ -1,16 +1,37 @@
-import type { OrderDTO } from "@/types";
+import { formatIqd } from "@/lib/currency";
+import type { OrderDTO, OrderItemDTO } from "@/types";
+
+export function buildOrderWhatsAppMessage(order: OrderDTO | (OrderDTO & { items?: OrderItemDTO[] })) {
+  const first = order.items?.[0];
+  const productName = first?.productName ?? "-";
+  const cap = order.capacity || "-";
+  const color = order.color || "-";
+  const qty = first?.quantity ?? 1;
+
+  return [
+    "طلب حجز جديد",
+    "",
+    `الجهاز: ${productName}`,
+    `السعة: ${cap}`,
+    `اللون: ${color}`,
+    `السعر: ${formatIqd(order.total)}`,
+    `الكمية: ${qty}`,
+    "",
+    `اسم الزبون: ${order.customerName}`,
+    `رقم الهاتف: ${order.phone}`,
+    `المحافظة: ${order.province || "-"}`,
+    `المنطقة: ${order.region || "-"}`,
+    `العنوان: ${order.address}`,
+    `الملاحظات: ${order.notes || "-"}`,
+  ].join("\n");
+}
 
 /**
  * Notification hook for new orders / status changes.
  *
- * IMPORTANT: automatic WhatsApp sending is NOT active. It requires the WhatsApp
- * Business Cloud API (or a provider such as Twilio) and approved credentials.
- * Today the store only offers MANUAL wa.me links (customer → store, admin → customer).
- *
- * To integrate later, implement `NotificationProvider` (e.g. WhatsAppCloudProvider reading
- * WHATSAPP_TOKEN / WHATSAPP_PHONE_ID from process.env) and return it from `getProvider()`.
+ * Automatic WhatsApp API is intentionally disabled until credentials are configured.
+ * Use the builder above to generate a message and pass it to your WhatsApp provider.
  */
-
 export interface NotificationProvider {
   readonly name: string;
   onOrderCreated(order: OrderDTO): Promise<void>;
@@ -24,7 +45,24 @@ const noopProvider: NotificationProvider = {
 };
 
 function getProvider(): NotificationProvider {
-  return noopProvider;
+  const token = process.env.WHATSAPP_API_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+
+  if (!token || !phoneId) {
+    return noopProvider;
+  }
+
+  return {
+    name: "whatsapp-cloud",
+    async onOrderCreated(order) {
+      if (!process.env.WHATSAPP_API_TOKEN || !process.env.WHATSAPP_PHONE_ID) return;
+      console.info("[notifications] WhatsApp provider ready:", buildOrderWhatsAppMessage(order));
+    },
+    async onOrderStatusChanged(order) {
+      if (!process.env.WHATSAPP_API_TOKEN || !process.env.WHATSAPP_PHONE_ID) return;
+      console.info("[notifications] status update message:", buildOrderWhatsAppMessage(order));
+    },
+  };
 }
 
 /** Never throws: a notification failure must not fail the order. */
