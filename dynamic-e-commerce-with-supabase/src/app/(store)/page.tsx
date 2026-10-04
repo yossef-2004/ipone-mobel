@@ -3,6 +3,7 @@ import { DbErrorNotice, EmptyState } from "@/components/ui/States";
 import { HeroPhone, type HeroPhoneItem } from "@/components/store/HeroPhone";
 import { ProductCard } from "@/components/store/ProductCard";
 import { Section } from "@/components/store/Section";
+import { StoreBackButton } from "@/components/store/StoreBackButton";
 import { formatIqd } from "@/lib/currency";
 import { thumbUrl } from "@/lib/image-url";
 import { safe } from "@/lib/safe";
@@ -92,6 +93,7 @@ export default async function HomePage() {
 
       {result.failed || !data ? (
         <div className="mx-auto mt-16 max-w-7xl px-4 sm:px-6">
+          <StoreBackButton fallbackHref="/" />
           <DbErrorNotice />
         </div>
       ) : (
@@ -115,6 +117,7 @@ export default async function HomePage() {
 
           {/* CATEGORIES */}
           <Section id="categories" eyebrow="الأقسام" title="تسوّق حسب الفئة">
+            <StoreBackButton fallbackHref="/" />
             {data.categories.length ? (
               <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
                 {data.categories.map((c, i) => (

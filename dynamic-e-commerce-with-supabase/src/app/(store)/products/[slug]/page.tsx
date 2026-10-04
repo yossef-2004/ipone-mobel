@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { AvailabilityBadge } from "@/components/store/AvailabilityBadge";
 import { OrderForm } from "@/components/store/OrderForm";
 import { ProductCard } from "@/components/store/ProductCard";
 import { ProductGallery } from "@/components/store/ProductGallery";
 import { StoreBackButton } from "@/components/store/StoreBackButton";
-import { DbErrorNotice } from "@/components/ui/States";
+import { DbErrorNotice, EmptyState } from "@/components/ui/States";
 import { formatIqd } from "@/lib/currency";
 import { safe } from "@/lib/safe";
 import { getProductBySlug, getRelatedProducts } from "@/services/products";
@@ -26,7 +25,7 @@ const decode = (s: string) => {
 export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   const { slug } = await params;
   const r = await safe(() => getProductBySlug(decode(slug)));
-  if (!r.data) return { title: "جهاز" };
+  if (!r.data) return { title: "جهاز", robots: { index: false, follow: false } };
   return { title: r.data.name, description: `${r.data.name} بسعر ${formatIqd(r.data.price)}` };
 }
 
@@ -41,11 +40,30 @@ export default async function ProductPage({ params }: Ctx) {
   if (result.failed) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20">
+        <StoreBackButton fallbackHref="/products" />
         <DbErrorNotice />
       </div>
     );
   }
-  if (!result.data) notFound();
+  if (!result.data) {
+    return (
+      <div className="mx-auto grid min-h-[70vh] max-w-7xl place-items-center px-4 py-10">
+        <div className="w-full">
+          <StoreBackButton fallbackHref="/products" />
+          <EmptyState
+            icon="🧭"
+            title="الصفحة غير موجودة"
+            description="الرابط الذي تبحث عنه غير صحيح أو أن الجهاز لم يعد معروضاً."
+            action={
+              <Link href="/products" className="grad-bg mt-2 rounded-full px-6 py-2.5 text-sm font-bold text-white">
+                تصفّح الأجهزة
+              </Link>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   const { product, related } = result.data;
   const discount =
