@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ProductFilters } from "@/components/store/ProductFilters";
 import { ProductCard } from "@/components/store/ProductCard";
+import { StoreBackButton } from "@/components/store/StoreBackButton";
 import { Pagination } from "@/components/ui/Pagination";
 import { DbErrorNotice, EmptyState } from "@/components/ui/States";
 import { siteConfig } from "@/config/site";
@@ -59,6 +60,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-10 pt-8 sm:px-6">
+      <StoreBackButton fallbackHref="/" />
       <div className="mb-8">
         <p className="mb-2 text-xs font-bold tracking-widest text-aqua">المتجر</p>
         <h1 className="text-3xl font-extrabold text-white sm:text-4xl">كل الأجهزة</h1>

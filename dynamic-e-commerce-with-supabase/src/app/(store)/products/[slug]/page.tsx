@@ -5,6 +5,7 @@ import { AvailabilityBadge } from "@/components/store/AvailabilityBadge";
 import { OrderForm } from "@/components/store/OrderForm";
 import { ProductCard } from "@/components/store/ProductCard";
 import { ProductGallery } from "@/components/store/ProductGallery";
+import { StoreBackButton } from "@/components/store/StoreBackButton";
 import { DbErrorNotice } from "@/components/ui/States";
 import { formatIqd } from "@/lib/currency";
 import { safe } from "@/lib/safe";
@@ -54,6 +55,7 @@ export default async function ProductPage({ params }: Ctx) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6">
+      <StoreBackButton fallbackHref="/products" />
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-xs text-white/45" aria-label="مسار التنقل">
         <Link href="/" className="hover:text-white">الرئيسية</Link>
         <span>/</span>
